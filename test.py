@@ -3,6 +3,7 @@ import wave
 import numpy
 import array
 import matplotlib.pyplot as plt
+import serial
 
 def calculateMagnitude(real, imaginary):
     magnitudes = [] #where we wills store mags
@@ -19,7 +20,6 @@ FORMAT = pyaudio.paInt16
 CHANNELS = 2
 RATE = 44100
 RECORD_SECONDS = 1000
-WAVE_OUTPUT_FILENAME = "output.wav"
 
 p = pyaudio.PyAudio()
 
@@ -28,6 +28,8 @@ stream = p.open(format=FORMAT,
                 rate=RATE,
                 input=True,
                 frames_per_buffer=CHUNK)
+ser = serial.Serial('/dev/ttyACM0')
+print "SERIAL NAME: " + ser.name
 
 print("* recording")
 
@@ -48,6 +50,8 @@ for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
     mags = calculateMagnitude(results.real, results.imag)
     big_freq_index =  mags.index(max(mags))
     freq = (big_freq_index * 44100) / (CHUNK)
+    #if i % 1000 == 0:
+    ser.write(str(freq))
     print (freq)
     #plt.clf()
     #plt.plot(freq, results.real, freq, results.imag)
@@ -59,6 +63,10 @@ stream.stop_stream()
 stream.close()
 p.terminate()
 
+
+# if we need to write it to a wav file (for testing)
+
+#WAVE_OUTPUT_FILENAME = "output.wav"
 #wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
 #wf.setnchannels(CHANNELS)
 #wf.setsampwidth(p.get_sample_size(FORMAT))

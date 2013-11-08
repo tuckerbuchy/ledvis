@@ -5,6 +5,7 @@ import array
 import matplotlib.pyplot as plt
 import serial
 import Tkinter
+import math
 
 def getColorFromWaveLength(wavelength):
     gamma = 1.00
@@ -72,9 +73,20 @@ def factorAdjust (color, factor, intensityMax, gamma):
         return numpy.round (intensityMax * (color * factor ** gamma))
 
 def getSoundRatio(freq):
-    highest_freq = 2000
-    lowest_freq = 50
-    return (freq - lowest_freq) / (highest_freq - lowest_freq)
+    freq_log = numpy.log(freq)/numpy.log(2)
+    #freq_log = math.log(freq, 4)
+    #freq_log = numpy.log2(freq)
+    freq_log_next_octave = numpy.ceil(freq_log)
+    freq_log_prev_octave = numpy.floor(freq_log)
+    print("freq_log: " + str(freq_log) + " next octave: " + str(freq_log_next_octave))
+    
+    
+    ratio = (freq_log - freq_log_prev_octave) / 1
+    print ("RATIO: " + str(ratio))
+    #highest_freq = 2000
+    #lowest_freq = 50
+    return ratio
+    #return (freq - lowest_freq) / (highest_freq - lowest_freq)
 
 def getVisualWavelengthFromRatio(ratio):
     #really it should be the inverse, because wavelength is 
@@ -92,7 +104,9 @@ def calculateMagnitude(real, imaginary):
         x += 1
     
     return magnitudes
-         
+
+BAND_LOWER = 500
+BAND_UPPER = 5000
 CHUNK = 2056
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
@@ -128,24 +142,24 @@ while(1):
     nums = array.array('h', data)
     results = numpy.fft.fft(nums)
     freq_bins = numpy.fft.fftfreq(len(nums), 1.0/RATE)
-    
+        
     results = results[0:(len(results)/2 - 1)]
     freq_bins = 2 * freq_bins[0:(len(freq_bins)/2 - 1)]
-    
+        
     mags = calculateMagnitude(results.real, results.imag)
- 
+     
     max_freq_index = mags.index(max(mags))
     max_freq = freq_bins[max_freq_index]
-
-    #mags_normalized = mags/freq_max
     
+        #mags_normalized = mags/freq_max
+        
     #Algorithm
     ##########
     #-Take ratio of max freq over reasonable auditory range (50-10000hz) 
     #-Times this ratio by the reasonable visual range (X-Ynm)
     #-convert visual wave length to rgb value
     #-send it over wire
-    if max_freq < 10000:
+    if max_freq >= BAND_LOWER and max_freq < BAND_UPPER:
         sound_ratio = getSoundRatio(max_freq)
         wave_length = getVisualWavelengthFromRatio(sound_ratio)
         color = getColorFromWaveLength(wave_length)
@@ -154,7 +168,7 @@ while(1):
     line.set_data(freq_bins, mags)
     fig.canvas.draw()
     fig.canvas.flush_events()
-
+    
     i += 1
 print("* done recording")
 

@@ -55,15 +55,11 @@ def getColorFromWaveLength(wavelength):
     else:
         factor = 0.0
 
-    R = int(round(factorAdjust (red, factor, max_intensity, gamma)));
-    G = int(round(factorAdjust (green, factor, max_intensity, gamma)));
-    B = int(round(factorAdjust (blue, factor, max_intensity, gamma)));
+    R = round(factorAdjust (red, factor, max_intensity, gamma));
+    G = round(factorAdjust (green, factor, max_intensity, gamma));
+    B = round(factorAdjust (blue, factor, max_intensity, gamma));
 
-    #return Color.FromArgb(R, G, B);
-    #eturn "R:" + R + ", G:" + G + ", B:" + B
-    
-    return "#" + (format((R), '02x')) + (format(int(G), '02x')) + (format(int(B), '02x')) #format(R,'x') + format(G, 'x') + format(B, 'x')
-    #return "#" + hex(R) + hex(G) + hex(B)
+    return (format(int(R), '02x')) + (format(int(G), '02x')) + (format(int(B), '02x')) #format(R,'x') + format(G, 'x') + format(B, 'x')
     
 def factorAdjust (color, factor, intensityMax, gamma):
     
@@ -73,9 +69,7 @@ def factorAdjust (color, factor, intensityMax, gamma):
         return numpy.round (intensityMax * (color * factor ** gamma))
 
 def getSoundRatio(freq):
-    freq_log = numpy.log(freq)/numpy.log(2)
-    #freq_log = math.log(freq, 4)
-    #freq_log = numpy.log2(freq)
+    freq_log = numpy.log(freq)/numpy.log(4)
     freq_log_next_octave = numpy.ceil(freq_log)
     freq_log_prev_octave = numpy.floor(freq_log)
     print("freq_log: " + str(freq_log) + " next octave: " + str(freq_log_next_octave))
@@ -83,10 +77,7 @@ def getSoundRatio(freq):
     
     ratio = (freq_log - freq_log_prev_octave) / 1
     print ("RATIO: " + str(ratio))
-    #highest_freq = 2000
-    #lowest_freq = 50
     return ratio
-    #return (freq - lowest_freq) / (highest_freq - lowest_freq)
 
 def getVisualWavelengthFromRatio(ratio):
     #really it should be the inverse, because wavelength is 
@@ -105,7 +96,10 @@ def calculateMagnitude(real, imaginary):
     
     return magnitudes
 
-BAND_LOWER = 500
+def getFrequencyIndex(freq):
+    return freq/(RATE/CHUNK)
+
+BAND_LOWER = 300
 BAND_UPPER = 5000
 CHUNK = 2056
 FORMAT = pyaudio.paInt16
@@ -137,6 +131,7 @@ plt.show(block=False)
 canvas = Tkinter.Tk()
 canvas.geometry("500x500")
 i = 0
+current_color = 0x000000
 while(1):
     data = stream.read(CHUNK)
     nums = array.array('h', data)
@@ -145,26 +140,22 @@ while(1):
         
     results = results[0:(len(results)/2 - 1)]
     freq_bins = 2 * freq_bins[0:(len(freq_bins)/2 - 1)]
-        
-    mags = calculateMagnitude(results.real, results.imag)
-     
-    max_freq_index = mags.index(max(mags))
-    max_freq = freq_bins[max_freq_index]
     
-        #mags_normalized = mags/freq_max
-        
-    #Algorithm
-    ##########
-    #-Take ratio of max freq over reasonable auditory range (50-10000hz) 
-    #-Times this ratio by the reasonable visual range (X-Ynm)
-    #-convert visual wave length to rgb value
-    #-send it over wire
+    mags = calculateMagnitude(results.real, results.imag)
+
+    max_mag  = max(mags)
+    max_freq_index = mags.index(max_mag)
+    max_freq = freq_bins[max_freq_index]
     if max_freq >= BAND_LOWER and max_freq < BAND_UPPER:
-        sound_ratio = getSoundRatio(max_freq)
-        wave_length = getVisualWavelengthFromRatio(sound_ratio)
-        color = getColorFromWaveLength(wave_length)
-        print("Frequency: " + str(max_freq) + " " + "Color: " + str(color))
-        canvas.configure(background=color)
+        if max_mag > 3e6:
+            sound_ratio = getSoundRatio(max_freq)
+            wave_length = getVisualWavelengthFromRatio(sound_ratio)
+            color = getColorFromWaveLength(wave_length)
+            #current_color = 
+            current_color = color
+            color_rgb = "#" + current_color
+            print("Frequency: " + str(max_freq) + " " + "Color: " + color_rgb)
+            canvas.configure(background=color_rgb)
     line.set_data(freq_bins, mags)
     fig.canvas.draw()
     fig.canvas.flush_events()

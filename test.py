@@ -8,6 +8,7 @@ import Tkinter
 import math
 import colorsys
 import matplotlib
+import struct
 
 #this is a class to implement the IIR filtering described by logan
 class IIR:
@@ -65,10 +66,10 @@ def mapFrequencyToHue(freq):
 HSV_VALUE = 0.7
 
 PEAK_THRESHOLD = 4e6
-BAND_LOWER = 50
-BAND_UPPER = 2000
+BAND_LOWER = 100
+BAND_UPPER = 1000
 
-SATURATION_FIR_DEQUE_SIZE = 50
+SATURATION_FIR_DEQUE_SIZE = 30
 HUE_IIR_ALPHA = 0.90
 
 CHUNK = 2048
@@ -86,7 +87,8 @@ stream = p.open(format=FORMAT,
                 rate=RATE,
                 input=True,
                 frames_per_buffer=CHUNK)
-#ser = serial.Serial('/dev/ttyACM0')
+
+ser = serial.Serial('/dev/ttyACM1')
 #print "SERIAL NAME: " + ser.name
 
 print("* recording")
@@ -140,17 +142,24 @@ while(1):
     max_sum = max(saturation_fir_deque)
     if max_sum == 0:
         max_sum = 1
-    saturation = average_sum/max_sum
+    saturation = 0.5 + (0.5)*average_sum/max_sum
     
     rgb = colorsys.hsv_to_rgb(hue, saturation, HSV_VALUE)
     rgb = map(convertPercentToColorValue, rgb)
     rgb_string = "#" + convertColorVectorToString(rgb)
+    #packet = [0,0,0]
+    packet = []
+
+    for color in rgb:
+        packet.append(color)
+    
+    ser.write(bytearray(packet))
     
     print("Frequency: " + str(max_freq) + " " + "Color: " + rgb_string)
     tk_canvas.configure(background=rgb_string)
     
     ##graph the fourier stuff
-    line.set_data(freq_bins, mags)
+    #line.set_data(freq_bins, mags)
     fig.canvas.draw()
     fig.canvas.flush_events()
 print("* done recording")

@@ -65,12 +65,12 @@ def mapFrequencyToHue(freq):
 ##################CONSTANTS####################
 HSV_VALUE = 0.7
 
-PEAK_THRESHOLD = 4e6
-BAND_LOWER = 100
-BAND_UPPER = 1000
+PEAK_THRESHOLD = 3e6
+BAND_LOWER = 40
+BAND_UPPER = 500
 
-SATURATION_FIR_DEQUE_SIZE = 30
-HUE_IIR_ALPHA = 0.90
+SATURATION_FIR_DEQUE_SIZE = 20
+HUE_IIR_ALPHA = 0.9
 
 CHUNK = 2048
 FORMAT = pyaudio.paInt16
@@ -78,7 +78,7 @@ CHANNELS = 2
 RATE = 44100
 RECORD_SECONDS = 1000
 
-OCTAVES = 2
+OCTAVES = 1
 ###############################################
 p = pyaudio.PyAudio()
 
@@ -88,8 +88,8 @@ stream = p.open(format=FORMAT,
                 input=True,
                 frames_per_buffer=CHUNK)
 
-ser = serial.Serial('/dev/ttyACM1')
-#print "SERIAL NAME: " + ser.name
+ser = serial.Serial('/dev/ttyACM0')
+print "SERIAL NAME: " + ser.name
 
 print("* recording")
 
@@ -142,7 +142,7 @@ while(1):
     max_sum = max(saturation_fir_deque)
     if max_sum == 0:
         max_sum = 1
-    saturation = 0.5 + (0.5)*average_sum/max_sum
+    saturation = 0.85 + (0.15)*average_sum/max_sum
     
     rgb = colorsys.hsv_to_rgb(hue, saturation, HSV_VALUE)
     rgb = map(convertPercentToColorValue, rgb)
@@ -159,7 +159,7 @@ while(1):
     tk_canvas.configure(background=rgb_string)
     
     ##graph the fourier stuff
-    #line.set_data(freq_bins, mags)
+    line.set_data(freq_bins, mags)
     fig.canvas.draw()
     fig.canvas.flush_events()
 print("* done recording")

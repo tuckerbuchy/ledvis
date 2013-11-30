@@ -17,7 +17,6 @@ void setup() {
  
  
 void loop() {
-
         // send data only when you receive data:
         if (Serial.available() == 3) {
                 // read the incoming byte:         

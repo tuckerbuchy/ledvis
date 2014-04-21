@@ -10,7 +10,6 @@ import colorsys
 import matplotlib
 import struct
 
-#this is a class to implement the IIR filtering described by logan
 class IIR:
     def __init__(self, alpha):
         self.alpha = alpha
@@ -147,7 +146,7 @@ while(1):
     rgb = colorsys.hsv_to_rgb(hue, saturation, HSV_VALUE)
     rgb = map(convertPercentToColorValue, rgb)
     rgb_string = "#" + convertColorVectorToString(rgb)
-    #packet = [0,0,0]
+    packet = [0,0,0]
     packet = []
 
     for color in rgb:

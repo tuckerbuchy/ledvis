@@ -21,7 +21,7 @@ class IIR:
 
 class SoundToColorProcessor:
     def __init__(self):
-        ##################CONSTANTS####################
+        self.serial_port = None
         self.HSV_VALUE = 0.7
 
         self.PEAK_THRESHOLD = 3e6
@@ -36,8 +36,8 @@ class SoundToColorProcessor:
         self.CHANNELS = 2
         self.RATE = 44100
 
+        self.PROCESSING = False
         self.OCTAVES = 1
-        ###############################################
     '''
     calculate the magnitude of the fourier tranform parts
     '''
@@ -74,17 +74,17 @@ class SoundToColorProcessor:
         return hue
 
     def startProcessing(self):
-
         p = pyaudio.PyAudio()
-
         stream = p.open(format=self.FORMAT,
                         channels=self.CHANNELS,
                         rate=self.RATE,
                         input=True,
                         frames_per_buffer=self.CHUNK)
-
-        #ser = serial.Serial('/dev/ttyACM0')
-        #print "SERIAL NAME: " + ser.name
+        try:
+            ser = serial.Serial(self.serial_port, timeout=1)
+        except serial.SerialException:
+            print "Couldn't connect to serial port"
+            return
 
         ###Plots and canvas initialization########
         plt.ion()
@@ -98,7 +98,7 @@ class SoundToColorProcessor:
         hue_iir = IIR(self.HUE_IIR_ALPHA)
         saturation_fir_deque = []
 
-        while(1):
+        while(self.PROCESSING is True):
             data = stream.read(self.CHUNK)
             nums = array.array('h', data)
             results = numpy.fft.fft(nums)
@@ -127,7 +127,7 @@ class SoundToColorProcessor:
             mag_sum = numpy.sum(mags)
             saturation_fir_deque.append(mag_sum)
             if len(saturation_fir_deque) > self.SATURATION_FIR_DEQUE_SIZE:
-                print("Popped!")
+                #print("Popped!")
                 saturation_fir_deque.pop(0)
             
             average_sum = numpy.mean(saturation_fir_deque)
@@ -145,32 +145,40 @@ class SoundToColorProcessor:
             for color in rgb:
                 packet.append(color)
             
-            #ser.write(bytearray(packet))
+            ser.write(bytearray(packet))
             
-            print("Frequency: " + str(max_freq) + " " + "Color: " + rgb_string)
+            #print("Frequency: " + str(max_freq) + " " + "Color: " + rgb_string)
             tk_canvas.configure(background=rgb_string)
             
             ##graph the fourier stuff
             line.set_data(freq_bins, mags)
             fig.canvas.draw()
             fig.canvas.flush_events()
+
+        ser.close()
+        plt.close()
+        tk_canvas.destroy()
         stream.stop_stream()
         stream.close()
         p.terminate()
 
+    def startStopCallback(self):
+        if (self.PROCESSING is True):
+            self.PROCESSING = False
+        else:
+            self.PROCESSING = True
+            self.startProcessing()
     def setUpperBand(self, val):
         high = int(val)
         if high <= self.BAND_LOWER:
-            #cannot set upper band below
-            print("CANT DO THAT!")
-            tkMessageBox.showinfo("Error", "Cannot set upper band this low")
+            print("Cannot set upper band this low")
         else:
             self.BAND_UPPER = int(val)
 
     def setLowerBand(self, val):
         low = int(val)
         if low >= self.BAND_UPPER:
-            tkMessageBox.showinfo("Error", "Cannot set lower bound this high")
+            print("Error", "Cannot set lower bound this high")
         else:
             self.BAND_LOWER = int(val)
 
@@ -183,17 +191,20 @@ class SoundToColorProcessor:
     def setNumberOfOctaves(self, val):
         self.OCTAVES = int(val)
 
+    def setSerial(self, val):
+        self.serial_port = val
+
     def start(self):
         main_window = Tk()
 
-        lower_band_slide = Entry(main_window)
-        lower_button = Button(main_window, text="Set Lower Band (Hz)", command=self.setLowerBand)
-        lower_band_slide.pack()
+        lower_band_entry = Entry(main_window)
+        lower_button = Button(main_window, text="Set Lower Band (Hz)", command=lambda:self.setLowerBand(lower_band_entry.get()))
+        lower_band_entry.pack()
         lower_button.pack()
         
-        upper_band_slide = Entry(main_window)
-        upper_button = Button(main_window, text="Set Upper Band (Hz)", command=self.setUpperBand)
-        upper_band_slide.pack()
+        upper_band_entry = Entry(main_window)
+        upper_button = Button(main_window, text="Set Upper Band (Hz)", command= lambda:self.setUpperBand(upper_band_entry.get()))
+        upper_band_entry.pack()
         upper_button.pack()
 
         num_octaves_slide = Scale(main_window, from_=1, to_=5, label="Number of Octaves", command=self.setFirQueue)
@@ -202,13 +213,14 @@ class SoundToColorProcessor:
         fir_queue_slide = Scale(main_window, from_=1, to_=40, label="FIR Saturation Queue", command=self.setFirQueue)
         fir_queue_slide.pack()
 
-        #iir_queue_slide = Scale(main_window, resolution_=0.01, from_=0, to_=1, label="IIR Hue Alpha", command=self.setHueAlpha)
-        #iir_queue_slide.pack()
-
-        self.startProcessing()
-        control_button = Button(main_window, text="Start/Pause", command=self.startProcessing)
+        ser_entry = Entry(main_window)
+        ser_button = Button(main_window, text="Set Serial Port", command=lambda:self.setSerial(ser_entry.get()))
+        ser_entry.pack()
+        ser_button.pack()
+        
+        control_button = Button(main_window, text="Start/Pause", command=self.startStopCallback)
         control_button.pack()
-
+        main_window.mainloop()
 
 proc = SoundToColorProcessor()
 proc.start();

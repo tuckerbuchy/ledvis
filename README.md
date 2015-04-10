@@ -8,6 +8,6 @@ Steps to get going on Linux machine (specifically debian, but can be used as a g
 
 Install useful tools and dependencies
 
-sudo apt-get install python-pip python-dev pulseaudio19-dev
+sudo apt-get install python-pip python-dev pulseaudio
 
 sudo pip install -r requirements.txt

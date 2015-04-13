@@ -74,12 +74,15 @@ class SoundToColorProcessor:
         return hue
 
     def startProcessing(self):
+	print("first!!!!!")
         p = pyaudio.PyAudio()
+	print("hello")
         stream = p.open(format=self.FORMAT,
                         channels=self.CHANNELS,
                         rate=self.RATE,
                         input=True,
                         frames_per_buffer=self.CHUNK)
+	print("goodbye")
         try:
             ser = serial.Serial(self.serial_port, timeout=1)
         except serial.SerialException:

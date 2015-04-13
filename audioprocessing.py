@@ -10,6 +10,7 @@ import math
 import colorsys
 import matplotlib
 import struct
+import argparse
 
 class IIR:
     def __init__(self, alpha):
@@ -73,21 +74,28 @@ class SoundToColorProcessor:
         hue = (freq_log - lower_log) / (1.0*upper_log - 1.0*lower_log)
         return hue
 
-    def startProcessing(self):
-	print("first!!!!!")
+    def startProcessing(self, use_serial):
+        '''
+        Performs the processing of the audio data into color values. 
+        use_serial -> a boolean to determine if we should send the color values over a serial port.
+        '''
+       
+        # open the audio stream on the sound card
         p = pyaudio.PyAudio()
-	print("hello")
         stream = p.open(format=self.FORMAT,
                         channels=self.CHANNELS,
                         rate=self.RATE,
                         input=True,
                         frames_per_buffer=self.CHUNK)
-	print("goodbye")
-        try:
-            ser = serial.Serial(self.serial_port, timeout=1)
-        except serial.SerialException:
-            print "Couldn't connect to serial port"
-            return
+
+        # check if we should open a serial port
+        serial_port = None
+        if use_serial:
+          try:
+              serial_port = serial.Serial(self.serial_port, timeout=1)
+          except serial.SerialException:
+              print "Couldn't connect to serial port"
+              return
 
         ###Plots and canvas initialization########
         plt.ion()
@@ -98,6 +106,7 @@ class SoundToColorProcessor:
         tk_canvas = Tk()
         tk_canvas.geometry("500x500")
 
+        # initialize the queues for the filtering techniques.
         hue_iir = IIR(self.HUE_IIR_ALPHA)
         saturation_fir_deque = []
 
@@ -130,7 +139,6 @@ class SoundToColorProcessor:
             mag_sum = numpy.sum(mags)
             saturation_fir_deque.append(mag_sum)
             if len(saturation_fir_deque) > self.SATURATION_FIR_DEQUE_SIZE:
-                #print("Popped!")
                 saturation_fir_deque.pop(0)
             
             average_sum = numpy.mean(saturation_fir_deque)
@@ -146,9 +154,12 @@ class SoundToColorProcessor:
             packet = []
 
             for color in rgb:
-                packet.append(color)
-            
-            ser.write(bytearray(packet))
+                packet.append(color)          
+
+            print "Serial port" + str(serial_port)
+            # write this value to the serial port if needed
+            if serial_port:
+              serial_port.write(bytearray(packet))
             
             #print("Frequency: " + str(max_freq) + " " + "Color: " + rgb_string)
             tk_canvas.configure(background=rgb_string)
@@ -158,19 +169,21 @@ class SoundToColorProcessor:
             fig.canvas.draw()
             fig.canvas.flush_events()
 
-        ser.close()
+        if serial_port:
+          serial_port.close()
+
         plt.close()
         tk_canvas.destroy()
         stream.stop_stream()
         stream.close()
         p.terminate()
 
-    def startStopCallback(self):
+    def toggleAudioProcessing(self, serial=False):
         if (self.PROCESSING is True):
             self.PROCESSING = False
         else:
             self.PROCESSING = True
-            self.startProcessing()
+            self.startProcessing(serial)
     def setUpperBand(self, val):
         high = int(val)
         if high <= self.BAND_LOWER:
@@ -197,14 +210,18 @@ class SoundToColorProcessor:
     def setSerial(self, val):
         self.serial_port = val
 
-    def start(self):
+    def buildGui(self, args):
+        """
+        Builds the UI to be able to customize parameters. 
+        Args -> an arg parser struct, for any command line parameters. 
+        """
         main_window = Tk()
-
+          
         lower_band_entry = Entry(main_window)
         lower_button = Button(main_window, text="Set Lower Band (Hz)", command=lambda:self.setLowerBand(lower_band_entry.get()))
         lower_band_entry.pack()
         lower_button.pack()
-        
+          
         upper_band_entry = Entry(main_window)
         upper_button = Button(main_window, text="Set Upper Band (Hz)", command= lambda:self.setUpperBand(upper_band_entry.get()))
         upper_band_entry.pack()
@@ -220,10 +237,27 @@ class SoundToColorProcessor:
         ser_button = Button(main_window, text="Set Serial Port", command=lambda:self.setSerial(ser_entry.get()))
         ser_entry.pack()
         ser_button.pack()
-        
-        control_button = Button(main_window, text="Start/Pause", command=self.startStopCallback)
+       
+        # get the arg to check if we should be sending data over serial port.
+        control_button = Button(main_window, text="Start/Pause", command=lambda:self.toggleAudioProcessing(serial=args.serial))
         control_button.pack()
+
         main_window.mainloop()
 
-proc = SoundToColorProcessor()
-proc.start();
+    def start(self, args):
+        if (args.gui == True):
+          self.buildGui(args)
+        else:
+          self.toggleAudioProcessing(serial=args.serial)
+
+def run():
+  parser = argparse.ArgumentParser(description='Start the audio processing')
+  parser.add_argument('-serial', action='store_true') 
+  parser.add_argument('-gui', action='store_true') 
+  args = parser.parse_args()
+
+  processor = SoundToColorProcessor()
+  processor.start(args)
+
+if __name__ == "__main__":
+  run()
